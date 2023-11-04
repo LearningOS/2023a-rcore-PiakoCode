@@ -84,6 +84,7 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
         
     let time = get_time_us()/1000;
     
+    // 灵感来自与 小队成员——肖炯 的交流， 交流内容： sys_task_info 函数的修改，访问内存地址
     let buffer_prt = buffers[0].as_mut_ptr() as *mut TaskInfo;
 
     unsafe {
