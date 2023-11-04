@@ -5,7 +5,7 @@ use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, get_current_syscall, current_user_token, memory_alloc, memory_dealloc
-    }, timer::get_time_us, syscall::{SYSCALL_GET_TIME, SYSCALL_WRITE, SYSCALL_MMAP, SYSCALL_MUNMAP, SYSCALL_SBRK, SYSCALL_TASK_INFO, SYSCALL_YIELD}, 
+    }, timer::get_time_us, 
     mm::{translated_byte_buffer,MapPermission, VirtAddr},
 };
 
@@ -75,29 +75,24 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
     
-    let buffers = translated_byte_buffer(current_user_token(), _ti as *const u8, size_of::<TaskInfo>());
-    let mut ti_ptr = _ti as *const TaskInfo as *const u8;
+    let mut buffers = translated_byte_buffer(current_user_token(), _ti as *const u8, size_of::<TaskInfo>());
+    // let ti_ptr = _ti as *const TaskInfo as *const u8;
+
+    let status  = TaskStatus::Running;
+        
+    let syscall_time = get_current_syscall();
+        
+    let time = get_time_us()/1000;
+    
+    let buffer_prt = buffers[0].as_mut_ptr() as *mut TaskInfo;
 
     unsafe {
-        (*_ti).status = TaskStatus::Running;
-        
-        (*_ti).syscall_times[SYSCALL_GET_TIME] = get_current_syscall(SYSCALL_GET_TIME);
-        (*_ti).syscall_times[SYSCALL_WRITE] = get_current_syscall(SYSCALL_WRITE);
-        (*_ti).syscall_times[SYSCALL_MMAP] = get_current_syscall(SYSCALL_MMAP);
-        (*_ti).syscall_times[SYSCALL_MUNMAP] = get_current_syscall(SYSCALL_MUNMAP);
-        (*_ti).syscall_times[SYSCALL_SBRK] = get_current_syscall(SYSCALL_SBRK);
-        (*_ti).syscall_times[SYSCALL_TASK_INFO] = get_current_syscall(SYSCALL_TASK_INFO);
-        (*_ti).syscall_times[SYSCALL_YIELD] = get_current_syscall(SYSCALL_YIELD);
-        
-        (*_ti).time = get_time_us()/1000;
-    }
-    
-    for buffer in buffers {
-        unsafe {
-            ti_ptr.copy_to(buffer.as_ptr() as *mut u8, buffer.len());
-            ti_ptr = ti_ptr.add(buffer.len());
-        }
-    }
+        let taskinfo =  &mut *buffer_prt;
+        taskinfo.status = status;
+        taskinfo.syscall_times = syscall_time;
+        taskinfo.time = time;
+    };
+
     0
 }
 

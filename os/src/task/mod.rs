@@ -14,6 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::MAX_SYSCALL_NUM;
 use crate::loader::{get_app_data, get_num_app};
 use crate::mm::{MapPermission, VirtAddr};
 use crate::sync::UPSafeCell;
@@ -164,11 +165,12 @@ impl TaskManager {
     }
 
     /// get current task's syscall times
-    fn get_current_syscall(&self, syscall_id:usize) -> u32 {
+    fn get_current_syscall(&self) -> [u32;MAX_SYSCALL_NUM] {
+        
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
 
-        return inner.tasks[current].syscall_time[syscall_id];
+        return inner.tasks[current].syscall_time.clone();
     }
 
     fn memory_alloc(&self, start_va:VirtAddr, end_va:VirtAddr, permission:MapPermission) -> isize {
@@ -263,8 +265,8 @@ pub fn update_syscall(syscall_id:usize) {
 
 
 /// Get current syscall num 
-pub fn get_current_syscall(syscall_id:usize) -> u32 {
-    TASK_MANAGER.get_current_syscall(syscall_id)
+pub fn get_current_syscall() -> [u32;MAX_SYSCALL_NUM] {
+    TASK_MANAGER.get_current_syscall()
 }
 
 /// memory_alloc
