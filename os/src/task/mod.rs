@@ -15,6 +15,7 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, VirtAddr};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -153,6 +154,57 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Update syscall times
+    fn update_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+
+        inner.tasks[cur].syscall_time[syscall_id] += 1;
+    }
+
+    /// get current task's syscall times
+    fn get_current_syscall(&self, syscall_id:usize) -> u32 {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+
+        return inner.tasks[current].syscall_time[syscall_id];
+    }
+
+    fn memory_alloc(&self, start_va:VirtAddr, end_va:VirtAddr, permission:MapPermission) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+
+        // println!("alloc start_va{}", start_va.floor().0);        
+
+        let memset = &mut inner.tasks[current].memory_set;
+
+        if memset.is_mapped(start_va, end_va) {
+            return -1;
+        }
+
+        memset.insert_framed_area(start_va, end_va, permission);
+        0
+    }
+
+    #[allow(unused)]
+    fn memory_dealloc(&self, start_va:VirtAddr, end_va:VirtAddr) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+
+        
+
+        let memset = &mut inner.tasks[current].memory_set;
+
+        let res = memset.delete_framed_area(start_va, end_va);
+        
+        return res;
+
+    }
+
+
+
+
 }
 
 /// Run the first task in task list.
@@ -201,4 +253,26 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+
+/// Update syscall times
+pub fn update_syscall(syscall_id:usize) {
+    TASK_MANAGER.update_syscall(syscall_id);
+}
+
+
+/// Get current syscall num 
+pub fn get_current_syscall(syscall_id:usize) -> u32 {
+    TASK_MANAGER.get_current_syscall(syscall_id)
+}
+
+/// memory_alloc
+pub fn memory_alloc(start_va:VirtAddr, end_va:VirtAddr, permission:MapPermission) -> isize{
+    TASK_MANAGER.memory_alloc(start_va, end_va, permission)
+}
+
+/// memory_dealloc
+pub fn memory_dealloc(start_va:VirtAddr, end_va:VirtAddr) -> isize {
+    TASK_MANAGER.memory_dealloc(start_va, end_va)
 }
