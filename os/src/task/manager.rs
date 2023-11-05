@@ -19,6 +19,17 @@ impl TaskManager {
     }
     /// Add process back to ready queue
     pub fn add(&mut self, task: Arc<TaskControlBlock>) {
+        
+        for (i, other_task) in self.ready_queue.iter().enumerate() {
+            let other_task_stride = other_task.inner_exclusive_access().stride;
+            let current_task_stride = task.inner_exclusive_access().stride;
+            // 从小到大排序
+            if other_task_stride > current_task_stride {
+                self.ready_queue.insert(i, task);
+                return;
+            }
+
+        }
         self.ready_queue.push_back(task);
     }
     /// Take a process out of the ready queue

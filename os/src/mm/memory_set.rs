@@ -60,6 +60,42 @@ impl MemorySet {
             None,
         );
     }
+    /// create this function for dealloc
+    #[allow(unused)]
+    pub fn delete_framed_area(&mut self, start_va: VirtAddr, _end_va: VirtAddr) -> isize {
+        let mut i: usize = 0;
+        let mut flag: isize = -1;
+        for data in &self.areas {
+            // println!("---data {} {}",data.vpn_range.get_start().0, data.vpn_range.get_end().0);
+            // println!("---unmap{} {}",start_va.floor().0, _end_va.ceil().0);
+            if data.vpn_range.get_start() == start_va.floor()
+                && data.vpn_range.get_end() == _end_va.ceil()
+            {
+                flag = 0;
+                break;
+            }
+            i += 1;
+        }
+        if flag == 0 {
+            self.areas[i].unmap(&mut self.page_table);
+            self.areas.remove(i);
+        }
+        return flag;
+    }
+    /// is_mapped
+    #[allow(unused)]
+    pub fn is_mapped(&mut self ,start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        // self.check_v();
+        for data in &self.areas {
+            // println!("---data {} start {} end{}", data.vpn_range.get_start().0, start_va.floor().0,end_va.ceil().0 );
+            if data.vpn_range.get_start() >= start_va.floor() && data.vpn_range.get_end() <= end_va.ceil()
+            {   
+                
+                return true;
+            }
+        }
+        return false;
+    }
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self

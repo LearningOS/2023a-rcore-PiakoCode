@@ -21,7 +21,11 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::loader::get_app_data_by_name;
+use crate::{
+    config::{MAX_SYSCALL_NUM, BIG_STRIDE},
+    loader::get_app_data_by_name,
+    mm::{translated_str, MapPermission, VirtAddr},
+};
 use alloc::sync::Arc;
 use lazy_static::*;
 pub use manager::{fetch_task, TaskManager};
@@ -43,6 +47,9 @@ pub fn suspend_current_and_run_next() {
     // ---- access current TCB exclusively
     let mut task_inner = task.inner_exclusive_access();
     let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
+
+    task_inner.stride = task_inner.stride + BIG_STRIDE / task_inner.priority; 
+    // println!("stride {}",task_inner.stride);
     // Change status to Ready
     task_inner.task_status = TaskStatus::Ready;
     drop(task_inner);
@@ -115,3 +122,73 @@ lazy_static! {
 pub fn add_initproc() {
     add_task(INITPROC.clone());
 }
+
+
+
+
+/// get the start time of current task
+pub fn task_start_time() -> usize {
+    current_task().unwrap().inner_exclusive_access().start_time
+}
+
+/// Update syscall times
+pub fn update_syscall(syscall_id: usize) {
+    let current_task = current_task().unwrap();
+    current_task.inner_exclusive_access().syscall_times[syscall_id] += 1;
+}
+
+/// get current syscall times
+pub fn get_current_syscall() -> [u32; MAX_SYSCALL_NUM] {
+    let curent_task = current_task().unwrap();
+    let syscall = curent_task.inner_exclusive_access().syscall_times.clone();
+    return syscall;
+}
+
+/// memory_alloc
+pub fn memory_alloc(start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> isize {
+    let binding = current_task().unwrap();
+    let memset = &mut binding.inner_exclusive_access().memory_set;
+
+    // println!("alloc start_va{}", start_va.floor().0);
+
+    if memset.is_mapped(start_va, end_va) {
+        return -1;
+    }
+
+    memset.insert_framed_area(start_va, end_va, permission);
+    0
+}
+
+/// memory dealloc
+pub fn memory_dealloc(start_va: VirtAddr, end_va: VirtAddr) -> isize {
+    let binding = current_task().unwrap();
+
+    let memset = &mut binding.inner_exclusive_access().memory_set;
+
+    let res = memset.delete_framed_area(start_va, end_va);
+
+    return res;
+}
+
+/// implement spawn
+pub fn new_spawn(_path: *const u8) -> isize {
+    let token = current_user_token();
+    let name = translated_str(token, _path);
+    let current_task = current_task().unwrap();
+    match get_app_data_by_name(&name) {
+        Some(elf) => {
+            let spawn_program = Arc::new(TaskControlBlock::new(elf));
+            // 添加到父进程的child中
+            current_task
+                .inner_exclusive_access()
+                .children
+                .push(spawn_program.clone());
+            let pid = spawn_program.pid.0;
+
+            add_task(spawn_program);
+            return pid as isize;
+        }
+        None => return -1,
+    }
+}
+
