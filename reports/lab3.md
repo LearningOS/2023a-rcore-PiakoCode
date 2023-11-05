@@ -3,6 +3,7 @@
 ## 实现功能
 
 - 修正我在ch3中 get_time 系统调用中的错误实现，使其能在多进程环境下正常运行
+- 修改其他系统调用，使它们能够正常运行
 - 实现了 spawn 函数，用于创建一个新的进程，并加入 ready_queue
 - 在TCB中添加了 priority 和 stride，并实现完成 stride 调度功能
 - 实现 set_priority 系统调用， 用于设置进程的优先级
